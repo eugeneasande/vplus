@@ -268,7 +268,7 @@
     // Function to fetch last receipt number from sheet
     async function fetchLastReceiptNumber() {
   try {
-    const response = await fetch("https://script.google.com/macros/s/AKfycby7MAE-V1Gs2n6e3OR5j655EjgkoXTT4cdKB09T7H-ZQas1rdee4EhQTvpBQ3lsmtDTZA/exec");
+    const response = await fetch("https://veeplus-proxy.onrender.com/submit");
     const result = await response.json();
     const data = Array.isArray(result) ? result : result.result || [];
 
