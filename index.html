@@ -238,332 +238,234 @@
   </div>
 
   <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
-  <script>
-    // Initialize Tailwind CSS
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            'blue-50': '#eff6ff',
-            'blue-100': '#dbeafe',
-            'blue-600': '#2563eb',
-            'blue-700': '#1d4ed8',
-            'gray-50': '#f9fafb',
-            'gray-100': '#f3f4f6',
-            'gray-300': '#d1d5db',
-            'gray-500': '#6b7280',
-            'gray-600': '#4b5563',
-            'gray-700': '#374151',
-          }
+ <script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          'blue-50': '#eff6ff',
+          'blue-100': '#dbeafe',
+          'blue-600': '#2563eb',
+          'blue-700': '#1d4ed8',
+          'gray-50': '#f9fafb',
+          'gray-100': '#f3f4f6',
+          'gray-300': '#d1d5db',
+          'gray-500': '#6b7280',
+          'gray-600': '#4b5563',
+          'gray-700': '#374151',
         }
       }
-    };
-  document.addEventListener('DOMContentLoaded', function() {
-    // Initialize receipt number by fetching from sheet
-    let receiptNumber = 1;
+    }
+  };
+
+  document.addEventListener('DOMContentLoaded', function () {
     const receiptInput = document.getElementById('receiptNumber');
     receiptInput.readOnly = true;
     receiptInput.classList.add('bg-gray-100', 'cursor-not-allowed');
-    
-    // Function to fetch last receipt number from sheet
+
     async function fetchLastReceiptNumber() {
-  try {
-    const response = await fetch("https://veeplus-proxy.onrender.com/get-last")
+      try {
+        const response = await fetch("https://veeplus-proxy.onrender.com/get-last");
+        const result = await response.json();
+        const lastReceipt = result.last_receipt || `VPL-${new Date().getFullYear()}-000`;
+        const match = lastReceipt.match(/VPL-(\d{4})-(\d+)/);
+        let nextNum = 1;
 
-    const result = await response.json();
-    const data = Array.isArray(result) ? result : result.result || [];
-
-    const currentYear = new Date().getFullYear().toString();
-    let maxNum = 0;
-
-    data.forEach(entry => {
-      const match = entry.receipt_no?.match(/VPL-(\d{4})-(\d+)/);
-      if (match && match[1] === currentYear) {
-        const num = parseInt(match[2]);
-        if (num > maxNum) {
-          maxNum = num;
+        if (match && match[1] === new Date().getFullYear().toString()) {
+          nextNum = parseInt(match[2]) + 1;
         }
+
+        const formatted = `VPL-${new Date().getFullYear()}-${String(nextNum).padStart(3, '0')}`;
+        receiptInput.value = formatted;
+      } catch (error) {
+        console.error("❌ Failed to fetch receipt number:", error);
+        receiptInput.value = `VPL-${new Date().getFullYear()}-001`;
+      }
+    }
+
+    fetchLastReceiptNumber();
+
+    const today = new Date();
+    document.getElementById('receiptDate').value = today.toISOString().split('T')[0];
+    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    document.getElementById('previewDate').textContent = today.toLocaleDateString('en-US', options);
+
+    document.getElementById('addItemBtn').addEventListener('click', function () {
+      const itemId = Date.now();
+      const itemHtml = `
+        <div class="item-row bg-gray-50 p-3 rounded-md" data-id="${itemId}">
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-2">
+            <div class="md:col-span-4"><input type="text" placeholder="Phone Model" class="item-desc w-full px-3 py-1 border border-gray-300 rounded text-sm"></div>
+            <div class="md:col-span-2"><input type="text" placeholder="IMEI" class="item-imei w-full px-3 py-1 border border-gray-300 rounded text-sm"></div>
+            <div class="md:col-span-1"><input type="number" placeholder="Qty" class="item-qty w-full px-3 py-1 border border-gray-300 rounded text-sm" value="1" min="1"></div>
+            <div class="md:col-span-3"><input type="number" placeholder="Price" class="item-price w-full px-3 py-1 border border-gray-300 rounded text-sm" min="0" step="0.01"></div>
+            <div class="md:col-span-2 flex items-center justify-end">
+              <button class="remove-item text-red-500 hover:text-red-700"><i class="fas fa-times"></i></button>
+            </div>
+          </div>
+        </div>`;
+      document.getElementById('itemsContainer').insertAdjacentHTML('beforeend', itemHtml);
+    });
+
+    document.getElementById('itemsContainer').addEventListener('click', function (e) {
+      if (e.target.classList.contains('remove-item') || e.target.closest('.remove-item')) {
+        const itemRow = e.target.closest('.item-row');
+        if (itemRow) itemRow.remove(), updateReceiptPreview();
       }
     });
 
-    const nextNum = maxNum + 1;
-    const formatted = `VPL-${currentYear}-${String(nextNum).padStart(3, '0')}`;
-    receiptInput.value = formatted;
+    const formInputs = ['customerName', 'customerPhone', 'customerId', 'receiptNumber', 'receiptDate', 'paymentMethod', 'user', 'notes'];
+    formInputs.forEach(id => document.getElementById(id).addEventListener('input', updateReceiptPreview));
 
-  } catch (error) {
-    console.error("❌ Failed to fetch receipt number:", error);
-    const fallback = `VPL-${new Date().getFullYear()}-001`;
-    receiptInput.value = fallback;
-  }
-}
+    document.getElementById('itemsContainer').addEventListener('input', updateReceiptPreview);
 
+    document.getElementById('printBtn').addEventListener('click', () => window.print());
 
-    
-    // Call the function to initialize
-    fetchLastReceiptNumber();
-    
-    // Set today's date as default
-    const today = new Date();
-    const formattedDate = today.toISOString().split('T')[0];
-    document.getElementById('receiptDate').value = formattedDate;
-    
-    // Format date for display
-    const options = { year: 'numeric', month: 'long', day: 'numeric' };
-    document.getElementById('previewDate').textContent = today.toLocaleDateString('en-US', options);
-    
-    // Add item button
-    document.getElementById('addItemBtn').addEventListener('click', function() {
-        const itemId = Date.now();
-        const itemHtml = `
-            <div class="item-row bg-gray-50 p-3 rounded-md" data-id="${itemId}">
-                <div class="grid grid-cols-1 md:grid-cols-12 gap-2">
-                    <div class="md:col-span-4">
-                        <input type="text" placeholder="Phone Model" class="item-desc w-full px-3 py-1 border border-gray-300 rounded text-sm">
-                    </div>
-                    <div class="md:col-span-2">
-                        <input type="text" placeholder="IMEI" class="item-imei w-full px-3 py-1 border border-gray-300 rounded text-sm">
-                    </div>
-                    <div class="md:col-span-1">
-                        <input type="number" placeholder="Qty" class="item-qty w-full px-3 py-1 border border-gray-300 rounded text-sm" value="1" min="1">
-                    </div>
-                    <div class="md:col-span-3">
-                        <input type="number" placeholder="Price" class="item-price w-full px-3 py-1 border border-gray-300 rounded text-sm" min="0" step="0.01">
-                    </div>
-                    <div class="md:col-span-2 flex items-center justify-end">
-                        <button class="remove-item text-red-500 hover:text-red-700">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-        document.getElementById('itemsContainer').insertAdjacentHTML('beforeend', itemHtml);
-    });
-    
-    // Remove item
-    document.getElementById('itemsContainer').addEventListener('click', function(e) {
-        if (e.target.classList.contains('remove-item') || e.target.closest('.remove-item')) {
-            const itemRow = e.target.closest('.item-row');
-            if (itemRow) {
-                itemRow.remove();
-                updateReceiptPreview();
-            }
-        }
-    });
-    
-    // Form inputs event listeners for live preview
-    const formInputs = [
-        'customerName', 'customerPhone', 'customerId', 'receiptNumber', 'receiptDate', 
-        'paymentMethod', 'user', 'notes'
-    ];
-    
-    formInputs.forEach(inputId => {
-        document.getElementById(inputId).addEventListener('input', updateReceiptPreview);
-    });
-    
-    // Items inputs event listeners
-    document.getElementById('itemsContainer').addEventListener('input', function(e) {
-        if (e.target.classList.contains('item-desc') || 
-            e.target.classList.contains('item-qty') || 
-            e.target.classList.contains('item-price')) {
-            updateReceiptPreview();
-        }
-    });
-    
-    // Print button
-    document.getElementById('printBtn').addEventListener('click', function() {
-        window.print();
+    document.getElementById('downloadBtn').addEventListener('click', function () {
+      const receipt = document.getElementById('receiptPreview');
+      let customerName = document.getElementById('customerName').value.trim() || 'receipt';
+      customerName = customerName.replace(/[^a-z0-9]/gi, '_');
+      let imei = '';
+      const firstItem = document.querySelector('.item-imei');
+      if (firstItem && firstItem.value) imei = '_' + firstItem.value.replace(/[^a-z0-9]/gi, '');
+
+      html2canvas(receipt, {
+        scale: 2,
+        logging: false,
+        useCORS: true
+      }).then(canvas => {
+        const link = document.createElement('a');
+        link.download = `${customerName}${imei}_receipt.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      });
     });
 
-    // Image download
-    document.getElementById('downloadBtn').addEventListener('click', function() {
-        const receipt = document.getElementById('receiptPreview');
-        let customerName = document.getElementById('customerName').value.trim() || 'receipt';
-        customerName = customerName.replace(/[^a-z0-9]/gi, '_');
-        
-        // Get first available IMEI
-        let imei = '';
-        const firstItem = document.querySelector('.item-imei');
-        if (firstItem && firstItem.value) {
-            imei = '_' + firstItem.value.replace(/[^a-z0-9]/gi, '');
-        }
+    document.getElementById('generateBtn').addEventListener('click', function () {
+      updateReceiptPreview();
+      const items = [];
+      const itemRows = document.querySelectorAll('.item-row');
+      let total = 0;
 
-        html2canvas(receipt, {
-            scale: 2,
-            logging: false,
-            useCORS: true
-        }).then(canvas => {
-            const link = document.createElement('a');
-            link.download = `${customerName}${imei}_receipt.png`;
-            link.href = canvas.toDataURL('image/png');
-            link.click();
-        });
-    });
+      itemRows.forEach(row => {
+        const model = row.querySelector('.item-desc').value || 'Item';
+        const imei = row.querySelector('.item-imei').value || '';
+        const qty = parseFloat(row.querySelector('.item-qty').value) || 0;
+        const price = parseFloat(row.querySelector('.item-price').value) || 0;
+        const amount = qty * price;
+        total += amount;
 
-    
-    // Generate button
-    document.getElementById('generateBtn').addEventListener('click', function() {
-        updateReceiptPreview();
-        
-        // Collect all items data
-        const items = [];
-        const itemRows = document.querySelectorAll('.item-row');
-        let total = 0;
-        
-        itemRows.forEach(row => {
-            const model = row.querySelector('.item-desc').value || 'Item';
-            const imei = row.querySelector('.item-imei').value || '';
-            const qty = parseFloat(row.querySelector('.item-qty').value) || 0;
-            const price = parseFloat(row.querySelector('.item-price').value) || 0;
-            const amount = qty * price;
-            total += amount;
-            
-            items.push({
-                model,
-                imei,
-                qty,
-                price,
-                amount
-            });
-        });
+        items.push({ model, imei, qty, price, amount });
+      });
 
-        // Send data to SheetDB
-        const receiptDate = document.getElementById('receiptDate').value;
-const now = new Date();
-const receiptTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+      const receiptDate = document.getElementById('receiptDate').value;
+      const receiptTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
 
-       fetch("https://veeplus-proxy.onrender.com/submit", {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    data: items.map(item => ({
-      name: document.getElementById('customerName').value,
-      phone: document.getElementById('customerPhone').value,
-      id: document.getElementById('customerId').value,
-      paymentMethod: document.getElementById('paymentMethod').value,
-      user: document.getElementById('user').value,
-      model: item.model,
-      imei: item.imei,
-      qty: item.qty,
-      price: item.price,
-      amount: item.amount,
-      total: total,
-      date: receiptDate,
-      time: receiptTime,
-      receipt_no: document.getElementById('receiptNumber').value
-    }))
-  })
-})
-
+      fetch("https://veeplus-proxy.onrender.com/submit", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(items.map(item => ({
+          name: document.getElementById('customerName').value,
+          phone: document.getElementById('customerPhone').value,
+          id: document.getElementById('customerId').value,
+          paymentMethod: document.getElementById('paymentMethod').value,
+          user: document.getElementById('user').value,
+          model: item.model,
+          imei: item.imei,
+          qty: item.qty,
+          price: item.price,
+          amount: item.amount,
+          total: total,
+          date: receiptDate,
+          time: receiptTime,
+          receipt_no: document.getElementById('receiptNumber').value
+        })))
+      })
         .then(res => res.json())
         .then(res => {
-            console.log('✅ Saved to Google Sheet:', res);
-            // Format new receipt number for next time
-            const currentValue = receiptInput.value;
-            const match = currentValue.match(/VPL-(\d{4})-(\d{3})/);
-            if (match) {
-              const year = match[1];
-              const num = parseInt(match[2]) + 1;
-              receiptInput.value = `VPL-${year}-${num.toString().padStart(3, '0')}`;
-            }
-            alert('✅ Receipt saved Successfully!');
-            
+          console.log('✅ Saved to Google Sheet:', res);
+          const currentValue = receiptInput.value;
+          const match = currentValue.match(/VPL-(\d{4})-(\d{3})/);
+          if (match) {
+            const year = match[1];
+            const num = parseInt(match[2]) + 1;
+            receiptInput.value = `VPL-${year}-${num.toString().padStart(3, '0')}`;
+          }
+          alert('✅ Receipt saved Successfully!');
         })
         .catch(err => {
-            console.error('❌ Error saving to Google Sheet:', err);
-            alert('❌ Failed to save receipt. Error: ' + err.message);
+          console.error('❌ Error saving to Google Sheet:', err);
+          alert('❌ Failed to save receipt. Error: ' + err.message);
         });
     });
-    
-    // Function to update receipt preview
+
     function updateReceiptPreview() {
-        // Customer info
-        document.getElementById('previewCustomer').textContent = document.getElementById('customerName').value || 'Customer Name';
-        document.getElementById('previewPhone').textContent = document.getElementById('customerPhone').value || 'Phone Number';
-        document.getElementById('previewId').querySelector('span').textContent = document.getElementById('customerId').value || 'Not provided';
-        document.getElementById('previewReceiptNo').textContent = document.getElementById('receiptNumber').value || 'VPL-2023-001';
-        
-        // Date and Time
-        const dateInput = document.getElementById('receiptDate').value;
-        const now = new Date();
-        if (dateInput) {
-            const date = new Date(dateInput);
-            const options = { year: 'numeric', month: 'long', day: 'numeric' };
-            document.getElementById('previewDate').textContent = date.toLocaleDateString('en-US', options);
-        }
-        // Display current time in 12-hour format with AM/PM and seconds
-        const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
-        document.getElementById('previewTime').textContent = now.toLocaleTimeString('en-US', timeOptions);
-        
-        // Payment method and user
-        document.getElementById('previewPaymentMethod').textContent = document.getElementById('paymentMethod').value;
-        document.getElementById('previewUser').textContent = document.getElementById('user').value || 'purity';
-        
-        // Notes
-        document.getElementById('previewNotes').textContent = document.getElementById('notes').value || '';
-        
-        // Items
-        const itemsContainer = document.getElementById('previewItems');
-        itemsContainer.innerHTML = '';
-        
-        let subtotal = 0;
-        const itemRows = document.querySelectorAll('.item-row');
-        
-        itemRows.forEach(row => {
-            const desc = row.querySelector('.item-desc').value || 'Item';
-            const qty = parseFloat(row.querySelector('.item-qty').value) || 0;
-            const price = parseFloat(row.querySelector('.item-price').value) || 0;
-            const amount = qty * price;
-            subtotal += amount;
-            
-            const itemHtml = `
-                <div class="grid grid-cols-1 md:grid-cols-12 gap-2 py-3 receipt-line">
-                    <div class="md:col-span-4 font-medium md:font-normal">${desc}</div>
-                    <div class="md:col-span-2 text-sm text-gray-600 md:text-base md:text-gray-800">
-                        <span class="md:hidden">IMEI: </span>${row.querySelector('.item-imei').value || ''}
-                    </div>
-                    <div class="md:col-span-1 text-right">
-                        <span class="md:hidden">Qty: </span>${qty}
-                    </div>
-                    <div class="md:col-span-2 text-right">
-                        <span class="md:hidden">Price: </span>Ksh${price.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
-                    </div>
-                    <div class="md:col-span-3 text-right font-medium">
-                        <span class="md:hidden">Amount: </span>Ksh${amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
-                    </div>
-                </div>
-            `;
-            itemsContainer.insertAdjacentHTML('beforeend', itemHtml);
-        });
-        
-        // If no items, add a default one
-        if (itemRows.length === 0) {
-            itemsContainer.innerHTML = `
-                <div class="grid grid-cols-12 gap-2 py-3 receipt-line">
-                    <div class="col-span-4">Service Fee</div>
-                    <div class="col-span-2"></div>
-                    <div class="col-span-1 text-right">1</div>
-                    <div class="col-span-2 text-right">Ksh0.00</div>
-                    <div class="col-span-3 text-right">Ksh0.00</div>
-                </div>
-            `;
-        }
-        
-        // Update totals
-        const totalsContainer = itemsContainer.nextElementSibling;
-        totalsContainer.innerHTML = `
-            <div class="grid grid-cols-12 gap-2 py-3 receipt-total font-bold text-lg">
-                <div class="col-span-8">Gross Total</div>
-                <div class="col-span-4 text-right">Ksh${subtotal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}</div>
+      document.getElementById('previewCustomer').textContent = document.getElementById('customerName').value || 'Customer Name';
+      document.getElementById('previewPhone').textContent = document.getElementById('customerPhone').value || 'Phone Number';
+      document.getElementById('previewId').querySelector('span').textContent = document.getElementById('customerId').value || 'Not provided';
+      document.getElementById('previewReceiptNo').textContent = document.getElementById('receiptNumber').value || 'VPL-2023-001';
+
+      const dateInput = document.getElementById('receiptDate').value;
+      const now = new Date();
+      if (dateInput) {
+        const date = new Date(dateInput);
+        document.getElementById('previewDate').textContent = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      }
+      document.getElementById('previewTime').textContent = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+      document.getElementById('previewPaymentMethod').textContent = document.getElementById('paymentMethod').value;
+      document.getElementById('previewUser').textContent = document.getElementById('user').value || 'purity';
+      document.getElementById('previewNotes').textContent = document.getElementById('notes').value || '';
+
+      const itemsContainer = document.getElementById('previewItems');
+      itemsContainer.innerHTML = '';
+      let subtotal = 0;
+      const itemRows = document.querySelectorAll('.item-row');
+
+      itemRows.forEach(row => {
+        const desc = row.querySelector('.item-desc').value || 'Item';
+        const imei = row.querySelector('.item-imei').value || '';
+        const qty = parseFloat(row.querySelector('.item-qty').value) || 0;
+        const price = parseFloat(row.querySelector('.item-price').value) || 0;
+        const amount = qty * price;
+        subtotal += amount;
+
+        const itemHtml = `
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-2 py-3 receipt-line">
+            <div class="md:col-span-4 font-medium md:font-normal">${desc}</div>
+            <div class="md:col-span-2 text-sm text-gray-600 md:text-base md:text-gray-800">
+              <span class="md:hidden">IMEI: </span>${imei}
             </div>
-        `;
+            <div class="md:col-span-1 text-right"><span class="md:hidden">Qty: </span>${qty}</div>
+            <div class="md:col-span-2 text-right"><span class="md:hidden">Price: </span>Ksh${price.toFixed(2)}</div>
+            <div class="md:col-span-3 text-right font-medium"><span class="md:hidden">Amount: </span>Ksh${amount.toFixed(2)}</div>
+          </div>`;
+        itemsContainer.insertAdjacentHTML('beforeend', itemHtml);
+      });
+
+      if (itemRows.length === 0) {
+        itemsContainer.innerHTML = `
+          <div class="grid grid-cols-12 gap-2 py-3 receipt-line">
+            <div class="col-span-4">Service Fee</div>
+            <div class="col-span-2"></div>
+            <div class="col-span-1 text-right">1</div>
+            <div class="col-span-2 text-right">Ksh0.00</div>
+            <div class="col-span-3 text-right">Ksh0.00</div>
+          </div>`;
+      }
+
+      const totalsContainer = itemsContainer.nextElementSibling;
+      totalsContainer.innerHTML = `
+        <div class="grid grid-cols-12 gap-2 py-3 receipt-total font-bold text-lg">
+          <div class="col-span-8">Gross Total</div>
+          <div class="col-span-4 text-right">Ksh${subtotal.toFixed(2)}</div>
+        </div>`;
     }
-    
-    // Initialize with one item
+
+    // Start with one item row
     document.getElementById('addItemBtn').click();
-});
+  });
+</script>
+
     </script>
 </body>
 </html>
